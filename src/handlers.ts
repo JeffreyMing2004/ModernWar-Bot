@@ -1,4 +1,5 @@
 import { sendGroupMessage, sendUserMessage } from './api';
+import { commandHandler } from './commands';
 
 export function handleDispatch(payload: any): void {
   const { t: type, d: data } = payload;
@@ -28,36 +29,54 @@ export function handleDispatch(payload: any): void {
 }
 
 function onGroupAtMessage(data: any): void {
-  const content = data.content || '';
+  const content = (data.content || '').trim();
   const groupOpenid = data.group_openid;
   const msgId = data.id;
   const author = data.author?.member_openid || 'unknown';
 
-  console.log(`[Group@] ${author}: ${content}`);
+  console.log(`[Group@] ${author}: ${JSON.stringify(content)}`);
+  console.log(`[Group@] raw data: ${JSON.stringify(data)}`);
 
-  // Example: reply to the @ message
-  if (groupOpenid) {
-    sendGroupMessage(groupOpenid, '收到！我是 ModernWar 机器人', msgId)
-      .then(() => console.log('[Reply] Group message sent'))
-      .catch((err) => console.error('[Reply] Failed:', err.message));
-  }
+  if (!groupOpenid) return;
+
+  const reply = async (text: string): Promise<void> => {
+    try {
+      await sendGroupMessage(groupOpenid, text, msgId);
+    } catch (err: any) {
+      console.error('[Reply] Failed:', err.message);
+    }
+  };
+
+  commandHandler({ content, openid: author, groupOpenid, reply });
 }
 
 function onGroupMessage(data: any): void {
+  const content = (data.content || '').trim();
+  const groupOpenid = data.group_openid;
+  const msgId = data.id;
   const author = data.author?.member_openid || 'unknown';
-  console.log(`[Group] ${author}: ${data.content || ''}`);
+
+  console.log(`[Group] ${author}: ${content}`);
+  if (!groupOpenid) return;
+
+  // May optionally handle non-@ group commands here too.
 }
 
 function onC2CMessage(data: any): void {
-  const content = data.content || '';
+  const content = (data.content || '').trim();
   const userOpenid = data.author?.user_openid;
   const msgId = data.id;
 
   console.log(`[C2C] ${userOpenid}: ${content}`);
 
-  if (userOpenid) {
-    sendUserMessage(userOpenid, '收到！我是 ModernWar 机器人', msgId)
-      .then(() => console.log('[Reply] C2C message sent'))
-      .catch((err) => console.error('[Reply] Failed:', err.message));
-  }
+  if (!userOpenid) return;
+  const reply = async (text: string): Promise<void> => {
+    try {
+      await sendUserMessage(userOpenid, text, msgId);
+    } catch (err: any) {
+      console.error('[Reply] Failed:', err.message);
+    }
+  };
+
+  commandHandler({ content, openid: userOpenid, reply });
 }
