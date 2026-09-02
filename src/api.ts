@@ -43,6 +43,39 @@ export async function sendGroupMessage(
   return data;
 }
 
+export interface GroupMemberInfo {
+  user_id?: string;
+  user_openid?: string;
+  member_openid?: string;
+  joined_at?: string;
+}
+
+/**
+ * Resolve real QQ number from a group member openid.
+ * Requires the bot to be in the group.
+ */
+export async function getGroupMember(
+  groupOpenid: string,
+  memberOpenid: string
+): Promise<GroupMemberInfo | null> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `${config.apiBase}/v2/groups/${groupOpenid}/members/${memberOpenid}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `QQBot ${token}`,
+      },
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) {
+    console.warn(`[API] Get group member failed:`, data);
+    return null;
+  }
+  return data as GroupMemberInfo;
+}
+
 /**
  * Send a text message to a user (single chat)
  */

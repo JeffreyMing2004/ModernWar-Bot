@@ -1,6 +1,8 @@
 import { getAccessToken } from './token';
 import { startGateway } from './gateway';
 import { config } from './config';
+import { initDb } from './db';
+import { createApp } from './routes';
 
 async function main(): Promise<void> {
   console.log('=================================');
@@ -20,8 +22,19 @@ async function main(): Promise<void> {
   console.log(`[Config] Intents: ${config.intents.join(', ')}`);
 
   try {
+    // Initialize database schema
+    await initDb();
+    console.log('[DB] Connected and schema ready');
+
+    // Start HTTP server (plugin APIs)
+    const app = createApp();
+    app.listen(config.server.port, () => {
+      console.log(`[HTTP] Plugin API listening on port ${config.server.port}`);
+    });
+
+    // Start QQ WebSocket gateway
     await getAccessToken();
-    await startGateway();
+    startGateway();
     console.log('[Bot] Started. Listening for events...');
   } catch (err: any) {
     console.error('[ERROR] Failed to start bot:', err.message);
