@@ -108,6 +108,37 @@ export function createApp(): express.Express {
   });
 
   // ============================================================
+  // 服务端上传战绩（预留）
+  // 由游戏服务端上报对局结果，暂未启用
+  // ============================================================
+
+  /**
+   * POST /api/report/match
+   * 预留接口：服务端上报单局战绩。
+   * 目前仅记录到 player_last_match，返回预留状态。
+   * 待服务端接入后启用季赛数据累计。
+   * Body: { game_id, result, game_mode?, kills?, deaths?, heads?, match_time? }
+   */
+  app.post('/api/report/match', async (req: Request, res: Response) => {
+    const body = req.body ?? {};
+    if (!body.game_id || !body.result) {
+      return res.status(400).json({ ok: false, message: '缺少 game_id/result' });
+    }
+    try {
+      await upsertLastMatch(body);
+      await logPluginEvent('server', 'report_match', body);
+      return res.json({
+        ok: true,
+        message: '战绩已记录（预留接口）',
+        reserved: true,
+      });
+    } catch (err: any) {
+      console.error('[Report match] error:', err.message);
+      return res.status(500).json({ ok: false, message: '服务器内部错误' });
+    }
+  });
+
+  // ============================================================
   // Player query / select endpoints
   // ============================================================
 
