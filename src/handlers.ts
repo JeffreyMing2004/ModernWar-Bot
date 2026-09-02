@@ -1,6 +1,17 @@
 import { sendGroupMessage, sendUserMessage } from './api';
 import { commandHandler } from './commands';
 
+/**
+ * Strip a leading @-mention token (e.g. <@openid> or @机器人名) from content,
+ * so the remaining text can be matched against commands.
+ */
+function stripMention(content: string): string {
+  return content
+    .replace(/^\s*<@[^>]+>\s*/, '') // <@openid>
+    .replace(/^\s*@\S+\s*/, '')     // @someone
+    .trim();
+}
+
 export function handleDispatch(payload: any): void {
   const { t: type, d: data } = payload;
 
@@ -29,12 +40,13 @@ export function handleDispatch(payload: any): void {
 }
 
 function onGroupAtMessage(data: any): void {
-  const content = (data.content || '').trim();
+  const rawContent = (data.content || '').trim();
+  const content = stripMention(rawContent);
   const groupOpenid = data.group_openid;
   const msgId = data.id;
   const author = data.author?.member_openid || 'unknown';
 
-  console.log(`[Group@] ${author}: ${JSON.stringify(content)}`);
+  console.log(`[Group@] ${author}: ${content}`);
   console.log(`[Group@] raw data: ${JSON.stringify(data)}`);
 
   if (!groupOpenid) return;
@@ -51,7 +63,8 @@ function onGroupAtMessage(data: any): void {
 }
 
 function onGroupMessage(data: any): void {
-  const content = (data.content || '').trim();
+  const rawContent = (data.content || '').trim();
+  const content = stripMention(rawContent);
   const groupOpenid = data.group_openid;
   const msgId = data.id;
   const author = data.author?.member_openid || 'unknown';
@@ -59,7 +72,16 @@ function onGroupMessage(data: any): void {
   console.log(`[Group] ${author}: ${content}`);
   if (!groupOpenid) return;
 
-  // May optionally handle non-@ group commands here too.
+  const reply = async (text: string): Promise<void> => {
+    try {
+      await sendGroupMessage(groupOpenid, text, msgId);
+    } catch (err: any) {
+      console.error('[Reply] Failed:', err.message);
+    }
+  };
+
+  // 处理非@模式下的群消息命令
+  commandHandler({ content, openid: author, groupOpenid, reply });
 }
 
 function onC2CMessage(data: any): void {
