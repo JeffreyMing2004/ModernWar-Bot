@@ -35,11 +35,13 @@ export function computeKd(heads: number, matches: number): number {
 /**
  * Upsert current-season stats (KD computed from heads/matches).
  * Resolves openid from game_id if not supplied.
+ * If game_id is unbound, record is stored as unclaimed (claimed=0).
  */
 export async function upsertSeasonStats(data: StatData): Promise<void> {
   const conn = await getPool().getConnection();
   try {
     const openid = data.openid ?? (await resolveOpenid(data.game_id));
+    const claimed = openid ? 1 : 0;
     const kills = data.kills ?? 0;
     const deaths = data.deaths ?? 0;
     const heads = data.heads ?? 0;
@@ -50,8 +52,8 @@ export async function upsertSeasonStats(data: StatData): Promise<void> {
 
     await conn.execute(
       `INSERT INTO player_stats
-         (openid, game_id, season, kills, deaths, heads, wins, losses, matches, kd, rank_label)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (openid, game_id, season, kills, deaths, heads, wins, losses, matches, kd, rank_label, claimed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          openid = VALUES(openid),
          kills = VALUES(kills),
@@ -61,8 +63,9 @@ export async function upsertSeasonStats(data: StatData): Promise<void> {
          losses = VALUES(losses),
          matches = VALUES(matches),
          kd = VALUES(kd),
-         rank_label = VALUES(rank_label)`,
-      [openid, data.game_id, data.season, kills, deaths, heads, wins, losses, matches, kd, data.rank_label ?? null]
+         rank_label = VALUES(rank_label),
+         claimed = VALUES(claimed)`,
+      [openid, data.game_id, data.season, kills, deaths, heads, wins, losses, matches, kd, data.rank_label ?? null, claimed]
     );
   } finally {
     conn.release();
@@ -71,15 +74,17 @@ export async function upsertSeasonStats(data: StatData): Promise<void> {
 
 /**
  * Store the most recent match for a player.
+ * If game_id is unbound, record is stored as unclaimed (claimed=0).
  */
 export async function upsertLastMatch(data: LastMatchData): Promise<void> {
   const conn = await getPool().getConnection();
   try {
     const openid = data.openid ?? (await resolveOpenid(data.game_id));
+    const claimed = openid ? 1 : 0;
     await conn.execute(
       `INSERT INTO player_last_match
-         (openid, game_id, result, game_mode, kills, deaths, heads, match_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         (openid, game_id, result, game_mode, kills, deaths, heads, match_time, claimed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          openid = VALUES(openid),
          result = VALUES(result),
@@ -87,9 +92,46 @@ export async function upsertLastMatch(data: LastMatchData): Promise<void> {
          kills = VALUES(kills),
          deaths = VALUES(deaths),
          heads = VALUES(heads),
-         match_time = VALUES(match_time)`,
-      [openid, data.game_id, data.result, data.game_mode ?? null, data.kills ?? 0, data.deaths ?? 0, data.heads ?? 0, data.match_time ?? null]
+         match_time = VALUES(match_time),
+         claimed = VALUES(claimed)`,
+      [openid, data.game_id, data.result, data.game_mode ?? null, data.kills ?? 0, data.deaths ?? 0, data.heads ?? 0, data.match_time ?? null, claimed]
     );
+  } finally {
+    conn.release();
+  }
+}
+
+/**
+ * Claim unclaimed records for a game_id once the player binds.
+ * Moves/marks previously unclaimed (claimed=0) records into the player's record
+ * by stamping openid and setting claimed=1.
+ * Returns the number of records claimed.
+ */
+export async function claimUnclaimed(gameId: string, openid: string): Promise<void> {
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    const [lastRes] = await conn.execute(
+      `UPDATE player_last_match
+       SET openid = ?, claimed = 1
+       WHERE game_id = ? AND claimed = 0`,
+      [openid, gameId]
+    );
+    const [statsRes] = await conn.execute(
+      `UPDATE player_stats
+       SET openid = ?, claimed = 1
+       WHERE game_id = ? AND claimed = 0`,
+      [openid, gameId]
+    );
+    await conn.commit();
+    const lastAffected = (lastRes as any)?.affectedRows ?? 0;
+    const statsAffected = (statsRes as any)?.affectedRows ?? 0;
+    if (lastAffected + statsAffected > 0) {
+      console.log(`[Claim] ${gameId} -> ${openid}: claimed ${lastAffected} last-match, ${statsAffected} stat record(s)`);
+    }
+  } catch (err) {
+    await conn.rollback();
+    throw err;
   } finally {
     conn.release();
   }
@@ -118,4 +160,33 @@ async function resolveOpenid(gameId: string): Promise<string> {
   );
   if (rows.length > 0) return String(rows[0].openid);
   return '';
+}
+
+interface UnclaimedRow extends RowDataPacket {
+  game_id: string;
+  season: string;
+  heads: number;
+  matches: number;
+  wins: number;
+  losses: number;
+  kd: number;
+}
+
+/**
+ * List unclaimed (not yet bound) data.
+ * Combines unclaimed last-match records and unclaimed season stats.
+ */
+export async function listUnclaimed(): Promise<any[]> {
+  const [matches] = await getPool().execute<RowDataPacket[]>(
+    `SELECT game_id, NULL AS season, heads, 1 AS matches, 0 AS wins, 0 AS losses,
+            NULL AS kd, result, game_mode
+     FROM player_last_match WHERE claimed = 0
+     ORDER BY updated_at DESC LIMIT 200`
+  );
+  const [stats] = await getPool().execute<UnclaimedRow[]>(
+    `SELECT game_id, season, heads, matches, wins, losses, kd
+     FROM player_stats WHERE claimed = 0
+     ORDER BY updated_at DESC LIMIT 200`
+  );
+  return [...matches, ...stats];
 }

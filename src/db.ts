@@ -47,10 +47,12 @@ export async function initDb(): Promise<void> {
         matches INT NOT NULL DEFAULT 0,
         kd DECIMAL(10,2) NOT NULL DEFAULT 0,
         rank_label VARCHAR(32) DEFAULT NULL,
+        claimed TINYINT NOT NULL DEFAULT 1,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_game_season (game_id, season),
         INDEX idx_openid (openid),
-        INDEX idx_game_id (game_id)
+        INDEX idx_game_id (game_id),
+        INDEX idx_claimed (claimed)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 
@@ -66,9 +68,11 @@ export async function initDb(): Promise<void> {
         deaths INT NOT NULL DEFAULT 0,
         heads INT NOT NULL DEFAULT 0,
         match_time DATETIME DEFAULT NULL,
+        claimed TINYINT NOT NULL DEFAULT 1,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_openid (openid),
-        INDEX idx_game_id (game_id)
+        INDEX idx_game_id (game_id),
+        INDEX idx_claimed (claimed)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 
@@ -82,6 +86,22 @@ export async function initDb(): Promise<void> {
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
+
+    // Migration: add `claimed` column to existing tables if missing
+    for (const table of ['player_stats', 'player_last_match']) {
+      const [cols] = await conn.query<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'claimed'`,
+        [table]
+      );
+      if (cols.length === 0) {
+        const afterCol = table === 'player_stats' ? 'rank_label' : 'match_time';
+        await conn.query(
+          `ALTER TABLE ${table} ADD COLUMN claimed TINYINT NOT NULL DEFAULT 1 AFTER ${afterCol}`
+        );
+        console.log(`[DB] Added claimed column to ${table}`);
+      }
+    }
   } finally {
     conn.release();
   }

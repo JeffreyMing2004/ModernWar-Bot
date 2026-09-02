@@ -70,6 +70,15 @@ export async function bindPlayer(openid: string, gameId: string): Promise<BindRe
 
     await conn.execute('INSERT INTO players (openid, game_id) VALUES (?, ?)', [openid, gameId]);
     await conn.commit();
+
+    // 绑定成功后，认领此前未绑定时上传的战绩
+    try {
+      const { claimUnclaimed } = await import('./pluginService');
+      await claimUnclaimed(gameId, openid);
+    } catch (err: any) {
+      console.warn(`[Bind] claim unclaimed data failed for ${gameId}:`, err.message);
+    }
+
     return { ok: true, message: '绑定成功', data: { openid, game_id: gameId } };
   } catch (err: any) {
     await conn.rollback();
@@ -91,6 +100,17 @@ export async function getGameIdByOpenid(openid: string): Promise<string | null> 
     [openid]
   );
   return rows.length > 0 ? rows[0].game_id : null;
+}
+
+/**
+ * Whether a game_id is currently bound to any player.
+ */
+export async function getBindState(gameId: string): Promise<boolean> {
+  const [rows] = await getPool().execute<NameRow[]>(
+    'SELECT openid FROM players WHERE game_id = ?',
+    [gameId]
+  );
+  return rows.length > 0;
 }
 
 /**

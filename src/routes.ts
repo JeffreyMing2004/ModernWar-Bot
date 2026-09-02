@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { bindPlayer, getSeasonStats, getLastMatch, getGameIdByOpenid, listByKD } from './services/playerService';
-import { upsertSeasonStats, upsertLastMatch, logPluginEvent, computeKd } from './services/pluginService';
+import { upsertSeasonStats, upsertLastMatch, logPluginEvent, computeKd, listUnclaimed } from './services/pluginService';
 
 export function createApp(): express.Express {
   const app = express();
@@ -114,9 +114,9 @@ export function createApp(): express.Express {
 
   /**
    * POST /api/report/match
-   * 预留接口：服务端上报单局战绩。
-   * 目前仅记录到 player_last_match，返回预留状态。
-   * 待服务端接入后启用季赛数据累计。
+   * 服务端上报单局战绩。
+   * 若 game_id 已绑定 -> 记录到该玩家名下；
+   * 若未绑定 -> 进入「未认领」区域(claimed=0)，待玩家绑定后自动认领。
    * Body: { game_id, result, game_mode?, kills?, deaths?, heads?, match_time? }
    */
   app.post('/api/report/match', async (req: Request, res: Response) => {
@@ -126,14 +126,30 @@ export function createApp(): express.Express {
     }
     try {
       await upsertLastMatch(body);
+      const { getBindState } = await import('./services/playerService');
+      const bound = await getBindState(body.game_id);
       await logPluginEvent('server', 'report_match', body);
       return res.json({
         ok: true,
-        message: '战绩已记录（预留接口）',
-        reserved: true,
+        message: bound ? '战绩已记录' : '战绩已记录（未绑定，待认领）',
+        claimed: bound,
       });
     } catch (err: any) {
       console.error('[Report match] error:', err.message);
+      return res.status(500).json({ ok: false, message: '服务器内部错误' });
+    }
+  });
+
+  /**
+   * GET /api/report/unclaimed
+   * 查看当前「未认领」的战绩数据（待玩家绑定后自动认领）。
+   */
+  app.get('/api/report/unclaimed', async (_req: Request, res: Response) => {
+    try {
+      const rows = await listUnclaimed();
+      return res.json({ ok: true, count: rows.length, data: rows });
+    } catch (err: any) {
+      console.error('[Unclaimed] error:', err.message);
       return res.status(500).json({ ok: false, message: '服务器内部错误' });
     }
   });
