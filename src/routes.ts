@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { bindPlayer, getSeasonStats, getLastMatch, getGameIdByOpenid, listByKD } from './services/playerService';
-import { upsertSeasonStats, upsertSeasonStatsWithKd, upsertLastMatch, logPluginEvent, listUnclaimed } from './services/pluginService';
+import { upsertSeasonStats, upsertLastMatch, logPluginEvent, listUnclaimed } from './services/pluginService';
 
 export function createApp(): express.Express {
   const app = express();
@@ -65,13 +65,16 @@ export function createApp(): express.Express {
 
   /**
    * POST /api/plugin/stats
-   * Push current-season stats. KD computed as kills / matches (win+, lose-).
-   * Body: { game_id, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
+   * Push current-season stats. The plugin supplies the KD value; the bot never computes KD.
+   * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
    */
   app.post('/api/plugin/stats', async (req: Request, res: Response) => {
     const body = req.body ?? {};
     if (!body.game_id) {
       return res.status(400).json({ ok: false, message: '缺少 game_id' });
+    }
+    if (typeof body.kd !== 'number' || isNaN(body.kd)) {
+      return res.status(400).json({ ok: false, message: '缺少有效的 kd 数值（KD 由插件计算，机器人不自动计算）' });
     }
     const data = {
       ...body,
@@ -89,8 +92,8 @@ export function createApp(): express.Express {
 
   /**
    * POST /api/plugin/kd
-   * Plugin pushes a pre-computed KD value for a player in a season.
-   * KD is provided by the plugin (kills / matches as computed plugin-side).
+   * Push current-season stats with a pre-computed KD value.
+   * KD is supplied by the plugin; the bot never computes KD.
    * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
    */
   app.post('/api/plugin/kd', async (req: Request, res: Response) => {
@@ -99,14 +102,14 @@ export function createApp(): express.Express {
       return res.status(400).json({ ok: false, message: '缺少 game_id' });
     }
     if (typeof body.kd !== 'number' || isNaN(body.kd)) {
-      return res.status(400).json({ ok: false, message: '缺少有效的 kd 数值' });
+      return res.status(400).json({ ok: false, message: '缺少有效的 kd 数值（KD 由插件计算，机器人不自动计算）' });
     }
     const data = {
       ...body,
       season: body.season ?? currentSeason(),
     };
     try {
-      await upsertSeasonStatsWithKd(data);
+      await upsertSeasonStats(data);
       await logPluginEvent('plugin', 'kd', data);
       return res.json({ ok: true, message: 'kd updated' });
     } catch (err: any) {
