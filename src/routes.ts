@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { bindPlayer, getSeasonStats, getLastMatch, getGameIdByOpenid, listByKD } from './services/playerService';
-import { upsertSeasonStats, upsertLastMatch, logPluginEvent, computeKd, listUnclaimed } from './services/pluginService';
+import { upsertSeasonStats, upsertSeasonStatsWithKd, upsertLastMatch, logPluginEvent, listUnclaimed } from './services/pluginService';
 
 export function createApp(): express.Express {
   const app = express();
@@ -83,6 +83,34 @@ export function createApp(): express.Express {
       return res.json({ ok: true, message: 'stats updated' });
     } catch (err: any) {
       console.error('[Plugin stats] error:', err.message);
+      return res.status(500).json({ ok: false, message: '服务器内部错误' });
+    }
+  });
+
+  /**
+   * POST /api/plugin/kd
+   * Plugin pushes a pre-computed KD value for a player in a season.
+   * KD is provided by the plugin (heads / matches as computed plugin-side).
+   * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
+   */
+  app.post('/api/plugin/kd', async (req: Request, res: Response) => {
+    const body = req.body ?? {};
+    if (!body.game_id) {
+      return res.status(400).json({ ok: false, message: '缺少 game_id' });
+    }
+    if (typeof body.kd !== 'number' || isNaN(body.kd)) {
+      return res.status(400).json({ ok: false, message: '缺少有效的 kd 数值' });
+    }
+    const data = {
+      ...body,
+      season: body.season ?? currentSeason(),
+    };
+    try {
+      await upsertSeasonStatsWithKd(data);
+      await logPluginEvent('plugin', 'kd', data);
+      return res.json({ ok: true, message: 'kd updated' });
+    } catch (err: any) {
+      console.error('[Plugin kd] error:', err.message);
       return res.status(500).json({ ok: false, message: '服务器内部错误' });
     }
   });
@@ -178,7 +206,7 @@ export function createApp(): express.Express {
           matches: stat.matches,
           wins: stat.wins,
           losses: stat.losses,
-          kd: computeKd(stat.heads, stat.matches),
+          kd: stat.kd, // stored KD (plugin-computed when uploaded via /api/plugin/kd)
         },
       });
     } catch (err: any) {

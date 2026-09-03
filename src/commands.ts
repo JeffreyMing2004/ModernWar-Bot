@@ -1,5 +1,4 @@
 import { getGameIdByOpenid, getLastMatch, getSeasonStats } from './services/playerService';
-import { computeKd } from './services/pluginService';
 
 export interface CommandContext {
   content: string;
@@ -112,7 +111,7 @@ async function handleBind(
 async function handleKD(gameId: string, reply: CommandContext['reply']): Promise<void> {
   const stat = await getSeasonStats(gameId, SEASON());
   if (!stat) return reply(`玩家 ${gameId} 当前赛季暂无KD数据`);
-  const kd = computeKd(stat.heads, stat.matches);
+  const kd = stat.kd; // plugin-uploaded KD (or auto-computed), stored value is canonical
   await reply(
     `【${gameId}】当前赛季KD ${kd}\n` +
       `对局数：${stat.matches}（胜 ${stat.wins} 负 ${stat.losses}）\n` +

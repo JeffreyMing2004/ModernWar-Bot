@@ -33,6 +33,46 @@ export function computeKd(heads: number, matches: number): number {
 }
 
 /**
+ * Upsert current-season stats, using a KD value supplied by the plugin.
+ * Resolves openid from game_id if not supplied.
+ * If game_id is unbound, record is stored as unclaimed (claimed=0).
+ */
+export async function upsertSeasonStatsWithKd(data: StatData & { kd: number }): Promise<void> {
+  const conn = await getPool().getConnection();
+  try {
+    const openid = data.openid ?? (await resolveOpenid(data.game_id));
+    const claimed = openid ? 1 : 0;
+    const kills = data.kills ?? 0;
+    const deaths = data.deaths ?? 0;
+    const heads = data.heads ?? 0;
+    const wins = data.wins ?? 0;
+    const losses = data.losses ?? 0;
+    const matches = wins + losses;
+    const kd = data.kd;
+
+    await conn.execute(
+      `INSERT INTO player_stats
+         (openid, game_id, season, kills, deaths, heads, wins, losses, matches, kd, rank_label, claimed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         openid = VALUES(openid),
+         kills = VALUES(kills),
+         deaths = VALUES(deaths),
+         heads = VALUES(heads),
+         wins = VALUES(wins),
+         losses = VALUES(losses),
+         matches = VALUES(matches),
+         kd = VALUES(kd),
+         rank_label = VALUES(rank_label),
+         claimed = VALUES(claimed)`,
+      [openid, data.game_id, data.season, kills, deaths, heads, wins, losses, matches, kd, data.rank_label ?? null, claimed]
+    );
+  } finally {
+    conn.release();
+  }
+}
+
+/**
  * Upsert current-season stats (KD computed from heads/matches).
  * Resolves openid from game_id if not supplied.
  * If game_id is unbound, record is stored as unclaimed (claimed=0).
