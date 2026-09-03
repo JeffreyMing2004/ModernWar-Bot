@@ -5,7 +5,7 @@ QQ 群聊机器人（ModernWar 战绩查询 + 玩家绑定 + 插件数据互联�
 ## 功能
 
 - **玩家绑定**：每个游戏ID仅能被绑定一次，同一QQ账号不可重复绑定
-- **KD 计算**：`人头数 ÷ 对局数`（胜 +1 输出胜场，负 + 输出负场），由插件推送数据，机器人计算
+- **KD 计算**：`击杀数 ÷ 对局数`（对局数 = 胜场 + 负场），可由机器人自动计算，或由插件直接上传 KD 值
 - **QQ 查询命令**：
   - `功能列表`（或 `帮助` / `菜单` / `help`）查看全部功能
   - `绑定玩家ID {你的游戏ID}`
@@ -103,12 +103,21 @@ Content-Type: application/json
 
 ### 插件数据接口（机器人 & 插件互联）
 
-推送当前赛季数据（KD 自动按 `人头数 ÷ 对局数` 计算）：
+推送当前赛季数据（KD 自动按 `击杀数 ÷ 对局数` 计算）：
 
 ```
 POST /api/plugin/stats
-{ "game_id": "玩家游戏ID", "season": "2026_S2", "heads": 120, "wins": 20, "losses": 10, "rank_label": "黄金" }
+{ "game_id": "玩家游戏ID", "season": "2026_S2", "kills": 120, "wins": 20, "losses": 10, "rank_label": "黄金" }
 ```
+
+推送当前赛季 **KD（插件计算好后直接上传，机器人不再重算）**：
+
+```
+POST /api/plugin/kd
+{ "game_id": "玩家游戏ID", "kd": 1.80, "season": "2026_S2", "kills": 120, "deaths": 60, "heads": 90, "wins": 20, "losses": 10, "rank_label": "黄金" }
+```
+
+> `kd` 为插件直接算好的值，机器人存储并展示它。`season` 缺省时取当前赛季。
 
 推送最近一局战绩：
 
@@ -149,4 +158,4 @@ POST /api/plugin/match
 
 ## 免责说明
 
-KD 计算：`人头数(heads) ÷ 对局数(wins+losses)`。对局样本由插件通过 `/api/plugin/*` 推送。
+KD 计算：`击杀数(kills) ÷ 对局数(wins+losses)`。对局样本由插件通过 `/api/plugin/*` 推送，或由插件直接上传算好的 `kd` 值。
