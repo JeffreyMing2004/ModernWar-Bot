@@ -66,22 +66,10 @@ function onGroupMessage(data: any): void {
   const rawContent = (data.content || '').trim();
   const content = stripMention(rawContent);
   const groupOpenid = data.group_openid;
-  const msgId = data.id;
   const author = data.author?.member_openid || 'unknown';
 
+  // 未被艾特 → 仅记录日志，不处理命令、不回复
   console.log(`[Group] ${author}: ${content}`);
-  if (!groupOpenid) return;
-
-  const reply = async (text: string): Promise<void> => {
-    try {
-      await sendGroupMessage(groupOpenid, text, msgId);
-    } catch (err: any) {
-      console.error('[Reply] Failed:', err.message);
-    }
-  };
-
-  // 处理非@模式下的群消息命令
-  commandHandler({ content, openid: author, groupOpenid, reply });
 }
 
 function onC2CMessage(data: any): void {
