@@ -25,11 +25,11 @@ interface LastMatchData {
 }
 
 /**
- * Compute KD as heads / matches - win+ lose-
+ * Compute KD as kills / matches - win+ lose-
  */
-export function computeKd(heads: number, matches: number): number {
+export function computeKd(kills: number, matches: number): number {
   if (!matches || matches <= 0) return 0;
-  return Math.round((heads / matches) * 100) / 100;
+  return Math.round((kills / matches) * 100) / 100;
 }
 
 /**
@@ -73,7 +73,7 @@ export async function upsertSeasonStatsWithKd(data: StatData & { kd: number }): 
 }
 
 /**
- * Upsert current-season stats (KD computed from heads/matches).
+ * Upsert current-season stats (KD computed from kills/matches).
  * Resolves openid from game_id if not supplied.
  * If game_id is unbound, record is stored as unclaimed (claimed=0).
  */
@@ -88,7 +88,7 @@ export async function upsertSeasonStats(data: StatData): Promise<void> {
     const wins = data.wins ?? 0;
     const losses = data.losses ?? 0;
     const matches = wins + losses;
-    const kd = computeKd(heads, matches);
+    const kd = computeKd(kills, matches);
 
     await conn.execute(
       `INSERT INTO player_stats

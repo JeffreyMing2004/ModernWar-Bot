@@ -65,7 +65,7 @@ export function createApp(): express.Express {
 
   /**
    * POST /api/plugin/stats
-   * Push current-season stats. KD computed as heads / matches (win+, lose-).
+   * Push current-season stats. KD computed as kills / matches (win+, lose-).
    * Body: { game_id, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
    */
   app.post('/api/plugin/stats', async (req: Request, res: Response) => {
@@ -90,7 +90,7 @@ export function createApp(): express.Express {
   /**
    * POST /api/plugin/kd
    * Plugin pushes a pre-computed KD value for a player in a season.
-   * KD is provided by the plugin (heads / matches as computed plugin-side).
+   * KD is provided by the plugin (kills / matches as computed plugin-side).
    * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
    */
   app.post('/api/plugin/kd', async (req: Request, res: Response) => {
@@ -188,7 +188,7 @@ export function createApp(): express.Express {
 
   /**
    * GET /api/player/select/kd?game_id=xxx&season=xxx
-   * Return current-season KD. KD = heads / matches.
+   * Return current-season KD. KD = kills / matches.
    */
   app.get('/api/player/select/kd', async (req: Request, res: Response) => {
     const gameId = String(req.query.game_id || '');

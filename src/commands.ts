@@ -115,7 +115,7 @@ async function handleKD(gameId: string, reply: CommandContext['reply']): Promise
   await reply(
     `【${gameId}】当前赛季KD ${kd}\n` +
       `对局数：${stat.matches}（胜 ${stat.wins} 负 ${stat.losses}）\n` +
-      `人头数：${stat.heads}`
+      `击杀数：${stat.kills}`
   );
 }
 
