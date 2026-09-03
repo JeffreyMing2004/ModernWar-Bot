@@ -66,7 +66,7 @@ export function createApp(): express.Express {
   /**
    * POST /api/plugin/stats
    * Push current-season stats. The plugin supplies the KD value; the bot never computes KD.
-   * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
+   * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label?, rank_score? }
    */
   app.post('/api/plugin/stats', async (req: Request, res: Response) => {
     const body = req.body ?? {};
@@ -94,7 +94,7 @@ export function createApp(): express.Express {
    * POST /api/plugin/kd
    * Push current-season stats with a pre-computed KD value.
    * KD is supplied by the plugin; the bot never computes KD.
-   * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label? }
+   * Body: { game_id, kd, season?, kills?, deaths?, heads?, wins?, losses?, rank_label?, rank_score? }
    */
   app.post('/api/plugin/kd', async (req: Request, res: Response) => {
     const body = req.body ?? {};
@@ -259,7 +259,12 @@ export function createApp(): express.Express {
       if (!stat || !stat.rank_label) return res.json({ ok: true, data: null, message: '无段位数据' });
       return res.json({
         ok: true,
-        data: { game_id: stat.game_id, season: stat.season, rank_label: stat.rank_label },
+        data: {
+          game_id: stat.game_id,
+          season: stat.season,
+          rank_label: stat.rank_label,
+          rank_score: stat.rank_score,
+        },
       });
     } catch (err: any) {
       console.error('[Select dw] error:', err.message);

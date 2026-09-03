@@ -107,7 +107,7 @@ Content-Type: application/json
 
 ```
 POST /api/plugin/stats
-{ "game_id": "玩家游戏ID", "kd": 1.80, "season": "2026_S2", "kills": 120, "deaths": 60, "heads": 90, "wins": 20, "losses": 10, "rank_label": "黄金" }
+{ "game_id": "玩家游戏ID", "kd": 1.80, "season": "2026_S2", "kills": 120, "deaths": 60, "heads": 90, "wins": 20, "losses": 10, "rank_label": "钻石", "rank_score": 1333 }
 ```
 
 > `kd` 为插件算好的值（缺省赛季时自动取当前赛季）。**两个赛季接口都必须携带 `kd`，缺少则返回 400。**
@@ -116,7 +116,7 @@ POST /api/plugin/stats
 
 ```
 POST /api/plugin/kd
-{ "game_id": "玩家游戏ID", "kd": 1.80, "season": "2026_S2", "kills": 120, "deaths": 60, "heads": 90, "wins": 20, "losses": 10, "rank_label": "黄金" }
+{ "game_id": "玩家游戏ID", "kd": 1.80, "season": "2026_S2", "kills": 120, "deaths": 60, "heads": 90, "wins": 20, "losses": 10, "rank_label": "钻石", "rank_score": 1333 }
 ```
 
 推送最近一局战绩：

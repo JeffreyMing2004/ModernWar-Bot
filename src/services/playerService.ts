@@ -24,6 +24,7 @@ interface StatRow extends RowDataPacket {
   losses: number;
   kd: number;
   rank_label: string | null;
+  rank_score: number | null;
 }
 
 interface LastMatchRow extends RowDataPacket {
@@ -118,7 +119,7 @@ export async function getBindState(gameId: string): Promise<boolean> {
  */
 export async function getSeasonStats(gameId: string, season: string): Promise<StatRow | null> {
   const [rows] = await getPool().execute<StatRow[]>(
-    `SELECT game_id, openid, season, heads, matches, kills, deaths, wins, losses, kd, rank_label
+    `SELECT game_id, openid, season, heads, matches, kills, deaths, wins, losses, kd, rank_label, rank_score
      FROM player_stats WHERE game_id = ? AND season = ?`,
     [gameId, season]
   );
@@ -142,7 +143,7 @@ export async function getLastMatch(gameId: string): Promise<LastMatchRow | null>
  */
 export async function listByKD(season: string, limit = 50): Promise<StatRow[]> {
   const [rows] = await getPool().execute<StatRow[]>(
-    `SELECT game_id, openid, season, heads, matches, kills, deaths, wins, losses, kd, rank_label
+    `SELECT game_id, openid, season, heads, matches, kills, deaths, wins, losses, kd, rank_label, rank_score
      FROM player_stats WHERE season = ? ORDER BY kd DESC LIMIT ?`,
     [season, limit]
   );

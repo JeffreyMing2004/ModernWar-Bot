@@ -47,6 +47,7 @@ export async function initDb(): Promise<void> {
         matches INT NOT NULL DEFAULT 0,
         kd DECIMAL(10,2) NOT NULL DEFAULT 0,
         rank_label VARCHAR(32) DEFAULT NULL,
+        rank_score INT DEFAULT NULL,
         claimed TINYINT NOT NULL DEFAULT 1,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_game_season (game_id, season),
@@ -100,6 +101,20 @@ export async function initDb(): Promise<void> {
           `ALTER TABLE ${table} ADD COLUMN claimed TINYINT NOT NULL DEFAULT 1 AFTER ${afterCol}`
         );
         console.log(`[DB] Added claimed column to ${table}`);
+      }
+    }
+
+    // Migration: add `rank_score` column to player_stats if missing (rank tier display)
+    {
+      const [cols] = await conn.query<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'player_stats' AND COLUMN_NAME = 'rank_score'`
+      );
+      if (cols.length === 0) {
+        await conn.query(
+          `ALTER TABLE player_stats ADD COLUMN rank_score INT DEFAULT NULL AFTER rank_label`
+        );
+        console.log('[DB] Added rank_score column to player_stats');
       }
     }
   } finally {

@@ -137,5 +137,7 @@ async function handleRank(gameId: string, reply: CommandContext['reply']): Promi
   const stat = await getSeasonStats(gameId, SEASON());
   const rank = stat?.rank_label;
   if (!rank) return reply(`玩家 ${gameId} 当前赛季暂无段位`);
-  await reply(`【${gameId}】当前赛季段位：${rank}`);
+  // 段位分数预留：rank_score 存在时显示为「钻石(1333)分」，缺省仅显示「钻石」
+  const score = stat.rank_score != null ? `(${stat.rank_score})` : '';
+  await reply(`【${gameId}】当前赛季段位：${rank}${score}分`);
 }

@@ -11,6 +11,7 @@ interface StatData {
   wins?: number;
   losses?: number;
   rank_label?: string | null;
+  rank_score?: number | null;
 }
 
 interface LastMatchData {
@@ -45,8 +46,8 @@ export async function upsertSeasonStats(data: StatData & { kd: number }): Promis
 
     await conn.execute(
       `INSERT INTO player_stats
-         (openid, game_id, season, kills, deaths, heads, wins, losses, matches, kd, rank_label, claimed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (openid, game_id, season, kills, deaths, heads, wins, losses, matches, kd, rank_label, rank_score, claimed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          openid = VALUES(openid),
          kills = VALUES(kills),
@@ -56,8 +57,9 @@ export async function upsertSeasonStats(data: StatData & { kd: number }): Promis
          losses = VALUES(losses),
          matches = VALUES(matches),
          kd = VALUES(kd),
-         rank_label = VALUES(rank_label)`,
-      [openid, data.game_id, data.season, kills, deaths, heads, wins, losses, matches, kd, data.rank_label ?? null, claimed]
+         rank_label = VALUES(rank_label),
+         rank_score = VALUES(rank_score)`,
+      [openid, data.game_id, data.season, kills, deaths, heads, wins, losses, matches, kd, data.rank_label ?? null, data.rank_score ?? null, claimed]
     );
   } finally {
     conn.release();
